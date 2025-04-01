@@ -231,7 +231,8 @@ const closeConn = (doc, conn) => {
       })
       docs.delete(doc.name)
     } else if (doc.conns.size === 0 && memoryCleanInt !== undefined) {
-      cleaners.set(doc.name, setTimeout(() => { docs.delete(doc.name) }, memoryCleanInt * 1000));
+      cleaners.set(doc.name, setTimeout(() => { docs.delete(doc.name); console.log("Deleting " + doc.name); }, memoryCleanInt * 1000));
+      console.log("Setting timer for " + doc.name);
     }
   }
   conn.close()
@@ -265,6 +266,7 @@ exports.setupWSConnection = (conn, req, { docName = (req.url || '').slice(1).spl
   // get doc, initialize if it does not exist yet
   const doc = getYDoc(docName, gc)
   if (cleaners.has(docName)) {
+    console.log("Clearing timeout for " + docName);
     clearTimeout(cleaners.get(docName))
     cleaners.delete(docName)
   }
