@@ -22,6 +22,7 @@ const wsReadyStateClosed = 3 // eslint-disable-line
 // disable gc when using snapshots!
 const gcEnabled = process.env.GC !== 'false' && process.env.GC !== '0'
 const persistenceDir = process.env.YPERSISTENCE
+const memoryCleanInt = isNaN(Number(process.env.YMEMORYCLEANINTERVAL)) ? undefined : Number(process.env.YMEMORYCLEANINTERVAL);
 /**
  * @type {{bindState: function(string,WSSharedDoc):void, writeState:function(string,WSSharedDoc):Promise<any>, provider: any}|null}
  */
@@ -66,6 +67,9 @@ exports.getPersistence = () => persistence
 const docs = new Map()
 // exporting docs so that others can use it
 exports.docs = docs
+
+const cleaners = new Map()
+exports.cleaners = cleaners
 
 const messageSync = 0
 const messageAwareness = 1
@@ -226,6 +230,8 @@ const closeConn = (doc, conn) => {
         doc.destroy()
       })
       docs.delete(doc.name)
+    } else if (doc.conns.size === 0 && memoryCleanInt !== undefined) {
+      cleaners.set(doc.name, setTimeout(() => { docs.delete(doc.name) }, memoryCleanInt * 1000));
     }
   }
   conn.close()
@@ -258,6 +264,10 @@ exports.setupWSConnection = (conn, req, { docName = (req.url || '').slice(1).spl
   conn.binaryType = 'arraybuffer'
   // get doc, initialize if it does not exist yet
   const doc = getYDoc(docName, gc)
+  if (cleaners.has(docName)) {
+    clearTimeout(cleaners.get(docName))
+    cleaners.delete(docName)
+  }
   doc.conns.set(conn, new Set())
   // listen and reply to events
   conn.on('message', /** @param {ArrayBuffer} message */ message => messageListener(conn, doc, new Uint8Array(message)))
